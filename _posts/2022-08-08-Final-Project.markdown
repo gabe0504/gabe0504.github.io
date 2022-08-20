@@ -13,14 +13,14 @@ subtitle: "Using Artificial Neural Networks to Identify Target Groups and Improv
 
 ## Introduction
 
-<p>A bank in Europe has clients across Germany, Spain, and France. Despite the international reach, the company has been losing customers. In order to prevent further churn, the company has decided to identify who is leaving the company in order to remind them of the exceptional service that they provide the customer. The bank has provided customer information, and from this, we will derive key variables in order to help the bank with their problem.
+A bank in Europe has clients across Germany, Spain, and France. Despite the international reach, the company has been losing customers. In order to prevent further churn, the company has decided to identify who is leaving the company in order to remind them of the exceptional service that they provide the customer. The bank has provided customer information, and from this, we will derive key variables in order to help the bank with their problem.
 
-<p>Using exploratory data analysis, we identify key variables and patterns that help us find relationships in the data that could tell us which customers are leaving.  Additionally, we determine what tools best accomplish our task and develop a model that is accurate, reliable, and predictable, and report our results.
+Using exploratory data analysis, we identify key variables and patterns that help us find relationships in the data that could tell us which customers are leaving.  Additionally, we determine what tools best accomplish our task and develop a model that is accurate, reliable, and predictable, and report our results.
 
 
-<p>We used seaborn library utilities to produce a pairplot across all of our features to see if we could identify any obvious relationships. Because we planned to use a neural network and since several of our features differed by several orders of magnitude, we created new standardized and normalized feature sets from our raw data.
+We used seaborn library utilities to produce a pairplot across all of our features to see if we could identify any obvious relationships. Because we planned to use a neural network and since several of our features differed by several orders of magnitude, we created new standardized and normalized feature sets from our raw data.
 
-<p>Next, using a heatmap we examined correlation between features in our raw data and our normalized/standardized data.  Finding some interesting apparent relationships in the pairplot and heatmaps we utilized distribution plots and scatterplots to further examine those features. Afterwards, we decided that no useful linear relationships for classification existed among the features. So we concluded a neural network indeed seemed to be the best tool to proceed further since it can find or learn complex nonlinear relationships.
+Next, using a heatmap we examined correlation between features in our raw data and our normalized/standardized data.  Finding some interesting apparent relationships in the pairplot and heatmaps we utilized distribution plots and scatterplots to further examine those features. Afterwards, we decided that no useful linear relationships for classification existed among the features. So we concluded a neural network indeed seemed to be the best tool to proceed further since it can find or learn complex nonlinear relationships.
 
 
 
@@ -90,7 +90,7 @@ df.head(5)
         text-align: right;
     }
 </style>
-<table border="1" class="dataframe">
+<table class="dataframe">
   <thead>
     <tr style="text-align: right;">
       <th></th>
@@ -207,7 +207,7 @@ df.head(5)
 # Checking for NaN and other anomalies
 df.info()
 ```
-
+```
     <class 'pandas.core.frame.DataFrame'>
     RangeIndex: 10000 entries, 0 to 9999
     Data columns (total 14 columns):
@@ -229,7 +229,7 @@ df.info()
      13  Exited           10000 non-null  int64
     dtypes: float64(2), int64(9), object(3)
     memory usage: 1.1+ MB
-
+```
 
 | Column Name| Date Type| Description|
 |:----------- | :--------|:----------- |
@@ -263,13 +263,13 @@ At first, this seemed significant. However, the length of time over which this c
 print('Number of People that Exited\n-----------------------')
 df.Exited.value_counts()
 ```
-
+```
     Number of People that Exited
     -----------------------
     0    7963
     1    2037
     Name: Exited, dtype: int64
-
+```
 
 
 
@@ -290,7 +290,7 @@ plt.show()
 
 
 
-![png](output_13_0.png)
+![png](../../../images/output_13_0.png)
 
 
 
@@ -315,7 +315,7 @@ plt.show()
 
 
 
-![png](output_16_0.png)
+![png](../../../images/output_16_0.png)
 
 
 
@@ -332,7 +332,7 @@ plt.show()
 
 
 
-![png](output_17_0.png)
+![png](../../../images/output_17_0.png)
 
 
 
@@ -376,7 +376,7 @@ plt.show()
 
 
 
-![png](output_23_0.png)
+![png](../../../images/output_23_0.png)
 
 
 
@@ -394,7 +394,7 @@ plt.show()
 
 
 
-![png](output_24_0.png)
+![png](../../../images/output_24_0.png)
 
 
 
@@ -454,7 +454,7 @@ plt.show()
 
 
 
-![png](output_28_0.png)
+![png](../../../images/output_28_0.png)
 
 
 
@@ -492,7 +492,7 @@ plt.show()
 
 
 
-![png](output_32_0.png)
+![png](../../../images/output_32_0.png)
 
 
 
@@ -508,7 +508,7 @@ plt.show()
 
 
 
-![png](output_33_0.png)
+![png](../../../images/output_33_0.png)
 
 
 
@@ -534,7 +534,7 @@ plt.show()
 
 
 
-![png](output_36_0.png)
+![png](../../../images/output_36_0.png)
 
 
 
@@ -552,7 +552,7 @@ plt.show()
 
 
 
-![png](output_37_0.png)
+![png](../../../images/output_37_0.png)
 
 
 
@@ -657,7 +657,7 @@ plt.show()
 
 
 
-![png](output_43_0.png)
+![png](../../../images/output_43_0.png)
 
 
 
@@ -679,7 +679,7 @@ plt.show()
 
 
 
-![png](output_45_0.png)
+![png](../../../images/output_45_0.png)
 
 
 
@@ -755,7 +755,7 @@ plt.show()
 
 
 
-![png](output_55_0.png)
+![png](../../../images/output_55_0.png)
 
 
 
@@ -804,13 +804,13 @@ plt.show()
 
 
 
-![png](output_59_0.png)
+![png](../../../images/output_59_0.png)
 
 
 
 
 
-![png](output_59_1.png)
+![png](../../../images/output_59_1.png)
 
 
 
@@ -832,7 +832,7 @@ plt.show()
 
 
 
-![png](output_61_0.png)
+![png](../../../images/output_61_0.png)
 
 
 
@@ -851,7 +851,7 @@ plt.show()
 
 
 
-![png](output_62_0.png)
+![png](../../../images/output_62_0.png)
 
 
 
@@ -887,13 +887,13 @@ plt.show()
 
 
 
-![png](output_64_0.png)
+![png](../../../images/output_64_0.png)
 
 
 
 
 
-![png](output_64_1.png)
+![png](../../../images/output_64_1.png)
 
 
 
@@ -919,13 +919,13 @@ sns.displot(data = df, x = 'Age', hue = 'Exited') #work on readability of the gr
 
 
 
-![png](output_66_1.png)
+![png](../../../images/output_66_1.png)
 
 
 
 
 
-![png](output_66_2.png)
+![png](../../../images/output_66_2.png)
 
 
 
@@ -974,7 +974,7 @@ plt.show()
 
 
 
-![png](output_69_0.png)
+![png](../../../images/output_69_0.png)
 
 
 
@@ -996,7 +996,7 @@ plt.show()
 
 
 
-![png](output_71_0.png)
+![png](../../../images/output_71_0.png)
 
 
 
@@ -1016,7 +1016,7 @@ plt.show()
 
 
 
-![png](output_72_0.png)
+![png](../../../images/output_72_0.png)
 
 
 
@@ -1059,7 +1059,7 @@ sns.heatmap(dfcorr, annot = True, cmap = 'CMRmap')
 
 
 
-![png](output_77_1.png)
+![png](../../../images/output_77_1.png)
 
 
 
@@ -1093,7 +1093,7 @@ sns.heatmap(dfcorr2, annot = True, cmap = 'CMRmap')
 
 
 
-![png](output_80_1.png)
+![png](../../../images/output_80_1.png)
 
 
 
@@ -1336,7 +1336,7 @@ plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=T
 
 
 
-![png](output_96_0.png)
+![png](../../../images/output_96_0.png)
 
 
 
@@ -1397,13 +1397,13 @@ plt.show()
 
 
 
-![png](output_101_0.png)
+![png](../../../images/output_101_0.png)
 
 
 
 
 
-![png](output_101_1.png)
+![png](../../../images/output_101_1.png)
 
 
 
@@ -1462,7 +1462,7 @@ plt.show()
 
 
 
-![png](output_107_0.png)
+![png](../../../images/output_107_0.png)
 
 
 
@@ -1517,7 +1517,7 @@ plt.show()
 
 
 
-![png](output_112_0.png)
+![png](../../../images/output_112_0.png)
 
 
 
