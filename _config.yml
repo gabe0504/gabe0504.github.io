@@ -22,8 +22,8 @@ title: "Gabriel Guerrero"
 email: "gabe.guerrero@gmail.com"
 description: "This website is meant to serve as a portfolio for my data science projects. I'll post both personal and school projects and include analytic notes about what I learned from the exercise."
 baseurl: "" # the subpath of your site, e.g. /blog
-url: "" # the base hostname & protocol for your site, e.g. http://example.com
-twitter_username: "@Gabriel11880981"
+url: "gabe0504.github.io" # the base hostname & protocol for your site, e.g. http://example.com
+twitter_username: "@tacovendorgabe"
 github_username:  "gabe0504"
 
 # Build settings
