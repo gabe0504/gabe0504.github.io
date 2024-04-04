@@ -1,0 +1,863 @@
+---
+title: 'Anova and Regression Exercise: Motor Trend Cars Data Set'
+author: "Gabriel Guerrero"
+date: "2024-03-07"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+  Now that I'm done with the undergrad program and am heading into the workforce, I wanted a simple project to practice standard statistical practices such as plotting, computing, and building a regression model. to do this, I'll start withe Motor Trend Cars dataset available in R. While the dataset itself contains only 32 cars, making it suscetible to testing errors, I picked it for its simplicity. Attention will focus on what predictors best give us insight into miles per gallon.
+  
+  The first part centers around exploring the data with visualizations and a few tests to gain insight. 
+  
+  The second exercise will focus on building a regression model and going through all the analytical steps to ensure the model is the best it can be.
+  
+
+
+```{r, warning=FALSE, message=FALSE}
+
+#load libraries and data
+library(dplyr)
+library(ggplot2)
+data(mtcars)
+
+```
+
+# Data Prep
+
+### Checking for Null Values
+```{r}
+#is.na.data.frame search for nulls in the whole dataframe
+#in this instance, which() pinpoints the location of a null value
+#combined with sum(), it will total the number of na's
+
+print("Total number of missing values")
+sum(which(is.na.data.frame(mtcars) == TRUE))
+```
+
+### Checking Data Types
+```{r, warning=FALSE, message=FALSE}
+
+#double check the variables are factors
+sapply(mtcars, class)
+
+```
+  Variables such as cylinder (cyl), and transmission (am) need to be converted from numeric to factor variables so that R will not compute them as actual integer values. This will be done in the future when we build the regression model. Converting them now will make it difficult to perform computations on the data frame later, such as cor().
+
+  However, let's create another column that notates the transmission data as automatic or manual. This will help us identify that categories during the exploratory phase of analysis.
+
+```{r}
+#create new columns that converts 0 to automatic and 1 to manual
+
+mtcars$transmission <- ifelse(mtcars$am == 0, 'automatic', 'manual')
+
+#check
+mtcars[ c('am','transmission') ]
+```
+
+
+
+# Exploratory Data Analysis
+
+```{r}
+#summarize continuous data
+summary(mtcars[c('mpg', 'disp','hp',
+'drat','wt','qsec')])
+
+```
+  Miles per gallon, horse power, and weight appear to have outliers. The median and mean for displacement and horsepower are right skewed. Both the outliers and skewes may cause problems.
+
+
+### Looking at Transmission Type
+```{r, warning=FALSE, message=FALSE}
+ggplot(mtcars, aes(transmission, mpg)) +
+  geom_boxplot() +
+  labs(title = "Boxplot of MPG by Transmission Type",
+       x = "Tansmission",
+       y = "MPG")
+
+#get mpg means by tansmission
+auto <- mtcars %>%
+  select(mpg, transmission) %>%
+  filter(transmission == 'automatic') %>%
+  summarize(mean = mean(mpg))
+
+manual <- mtcars %>% 
+  select(mpg, transmission) %>% 
+  filter(transmission == 'manual') %>%
+  summarize(mean = mean(mpg))
+
+
+paste("Automatic Transmission mean mpg", round(auto, 2))
+paste("Manual Transmission mean mpg", round(manual, 2))
+```
+  Automatic gets less mpg than manual. The median mpg for automatic is around 17 mpg with a mean of 17, and the median for manual looks to be somewhere around 24 mpg as does the mean. 
+  
+  First, we'll test to see if there's a statistical difference in miles per gallon between the transmission types. If there is a difference, then we'll get the effect size to see how about much of a difference transmission really makes.
+
+  Let's make sure the data is normally distributed before performing a t-test.
+
+```{r, warning=FALSE, message=FALSE}
+#build density plot and seperate into grids
+ggplot(mtcars, aes(mpg, fill = transmission)) + 
+  geom_density(alpha =.4 ) +
+  facet_wrap(~transmission) +
+  labs(title = "Density Plot of Automatic MPG",
+       x = "Transmission")
+
+#shapiro test for normality
+auto_mpg <- mtcars %>%
+  select(mpg, transmission) %>%
+  filter(transmission == 'automatic')
+
+manual_mpg <- mtcars %>% 
+  select(mpg, transmission) %>% 
+  filter(transmission == 'manual')
+
+shapiro.test(auto_mpg$mpg)
+shapiro.test(manual_mpg$mpg)
+
+```
+
+
+
+  Neither automatic or manual transmission appear to have normally distributed miles per gallon. The Shapiro Test for Normality provides a statistic to tell us if the data is normally distributed. The null hypothesis states the data is normally distributed, while the alternative says it's not.  With both our p-values greater than .05, the test confirms that the samples are normally distributed (automatic p = .8987, manual p =.5363).
+
+  Now we need to use the Levene Test for equality of variances.
+
+```{r, warning=FALSE, message=FALSE}
+library(car)
+leveneTest(mtcars$mpg ~ as.factor(mtcars$transmission))
+
+```
+
+  While our data is normally distributed, Levene's test showed that the variance between automatic and manual transmission for mpg are not equal and thus we fail to meet this assumption for t-test (p < .05).
+
+  Because of this, we can use either a non-parametric approach to test for differences, or set our variance parameter in the t.test() function to "unequal variance." For this exercise, we'll do both to see what the results are.
+
+
+```{r, warning=FALSE, message=FALSE}
+wilcox.test(mpg~am, data= mtcars, alternative = 'less')
+
+```
+
+  With the Wilcox rank sum test,the differences in mpg between automatic and manual are not the same. In fact, automatic gets less mpg than manual at a statistically significant rate.
+
+
+```{r, warning=FALSE, message=FALSE}
+#these two difference approaches do the same thing
+#0 = automatic, 1 = manual transmission
+
+t.test(mpg~transmission, data = mtcars, 
+       var.equal = FALSE,  alternative = "less")
+
+```
+
+  We set the alternative hypothesis to see if the mean mpg of automatic transmission is significantly less than the mean of manual transmission. At a significance of p < .05, our p-value for the test came out to .00068. We can refute the null hypothesis in favor of the alternative, which states that mean mpg for automatic transmission is significantly less.
+
+
+  Now we'll see how much automatic differs in mpg from manual. Following our pattern that considers automatic first, we will set automatic on the left side of the subtraction operator. If the mean mpg of manual transmission is larger, cohen's d will be negative, indicating how much less mpg automatic gets compared to manual transmission.
+  
+```{r, warning=FALSE, message=FALSE}
+library(effsize)
+
+cohen.d(auto_mpg$mpg, manual_mpg$mpg)
+
+```
+  
+  Cohen's d came out to -1.48. This indicates a difference of 1.48 standard deviations from the mean of 0 (no difference) towards the left tail. Automatic transmission gets less mpg to a large degree from manual transmission.
+  
+  This category may prove impactful for the regression model.
+
+### Weight
+```{r, warning=FALSE, message=FALSE}
+ggplot(mtcars, aes(x = transmission, wt)) +
+  geom_boxplot() +
+  labs(title = "weight by Transmission Type",
+       x = "Transmission",
+       y = "Weight")
+
+aut <- mtcars %>% 
+  select(wt, transmission) %>% 
+  filter(transmission == 'automatic') %>%
+  summarize(mean_weight = mean(wt))
+
+man <- mtcars %>% 
+  select(wt, transmission) %>% 
+  filter(transmission == 'manual') %>%
+  summarize(mean_weight = mean(wt))
+
+paste("Mean weight for automatic transmission:", 
+      round(aut, 2))
+paste("Mean weight for manual transmission:", 
+      round(man, 2))
+
+```
+  The mean weight for automatic transmission is 3,770 lbs, and for manual transmission it is 2,410 lbs. Neither of these means diverges from the medians visualized in the boxplots. We'll see if this difference matters, but for right now it's worth noting that automatic transmission has four outliers--three on the upper end of the weight distribution and one on the lower end.
+  
+  The lower-end outlier for automatic is almost equivalent with the median for Manual. While manual has a wider, balanced spread, automatic has outliers that skew the distribution. 
+
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(mtcars, aes(wt, fill = transmission)) +
+  geom_density(alpha = .4) +
+  facet_wrap(~transmission)
+
+
+
+auto_wt <- mtcars %>%
+  select(wt, transmission) %>%
+  filter(transmission == 'automatic')
+
+manual_wt <- mtcars %>%
+  select(wt, transmission) %>%
+  filter(transmission == 'manual')
+
+
+shapiro.test(auto_wt$wt)
+shapiro.test(manual_wt$wt)
+
+```
+
+  The data for automatic transmission's weight is not normally distributed. The Shapiro test gave a pvalue = .003, which is significantly less than p < 0.05. 
+
+
+  Already we can't meet the normality assumption and will have to use a nonparametric test. But before doing so, I want to see if the variances are not constant since I suspect they're not constant.
+
+```{r, warning=FALSE, message=FALSE}
+leveneTest(mtcars$wt, mtcars$transmission)
+
+
+```
+
+  Levene's test yeilds a pvalue with which we cannot reject the null-hypothesis, which states that the variances between the two group are not equal.
+
+
+```{r, warning=FALSE, message=FALSE}
+wilcox.test(auto_wt$wt, manual_wt$wt,  
+            alternative = "greater")
+```
+
+  Wilcox test gives a pvalue < 0.05. The two transmission types are not equal in mean weight.
+  
+```{r}
+cohen.d(auto_wt$wt, manual_wt$wt)
+
+
+```
+  With an effect size of 1.89, and a t-test pvalue of .00002, we can conclude that there are differences in weight between automatic and manual transmission and that automatic transmission is significantly heavier than manual transmission. 
+  
+  Since we know there's a difference in mpg performance between the two transmission types, and that the two transmissions have significant weight differences, we can see a relation between weight an mpg. If we include transmission type in our regression model, it may be redundant and create an inefficient model. Still, this exercise is about experimenting and learning, so we'll see how well the initial regression model performs with transmission as a predictor.
+
+
+
+### Looking at Cylinder
+
+  With the Cylinder category, I'm curious if there are differences in mpg performance and if this variable cold be used as a predictor for mpg performance.
+
+```{r, warning=FALSE, message=FALSE}
+plotdata <- mtcars %>%
+  group_by(cyl) %>%
+  summarize(n = n(),
+            mean = mean(mpg),
+            sd = sd(mpg),
+            ci = qt(0.975, df = n -1) * sd/sqrt(n))
+
+plotdata
+
+
+ggplot(plotdata, 
+       aes(cyl, mean)) +
+  geom_point(dotsize = 2) +
+  geom_line(linetype = 'dashed') +
+  geom_errorbar(aes(ymin = mean-ci,
+                    ymax = mean+ci))+
+  theme_bw()+
+  labs(title = "Mean MPG of Cylinders with Conf Inter",
+       x = "Cylinders",
+       y = "Average MPG")
+```
+  4-Cylinder has the best mpg performance, but also has the highest standard deviation. Six- and eight-cylinder cars have average mpgs that closer together and slimmer standard deviations.
+
+```{r, warning=FALSE, message=FALSE}
+
+fit <- aov(mpg ~ as.factor(cyl), data = mtcars)
+
+summary(fit)
+```
+
+  ANOVA within-group test shows that each category has significant differences (p = 04.98e-09). Now I'll build a pairwise ANOVA test to see where the differences are between each variable and then get the $\eta^2$ effect size.
+
+
+```{r, warning=FALSE, message=FALSE}
+library("effectsize")
+
+pairwise <- TukeyHSD(fit)
+pairwise
+
+eta_squared(fit)
+```
+
+  All possible comparisons between cylinders return a p-value less than .05. Additionally, none of the confidence intervals provided contain 0 within them. This means that at every comparison among cylinders, all of them show statistically significant differences for mpg. Additionally, the $\eta^2$ statistic tells us the effect size of an anova test. 0.73 indicates a large effect size between the means of the cylinder categories. In other words, the number of cyclinders in your car will affect the mpg performance.
+
+
+  Now we'll look at the correlation matrix for our regression model. Since we are interested in predicting for miles per gallon, we'll only call the mpg column from the correlation matrix since it contains the correlation coefficients for the variables of interest.
+
+
+```{r}
+
+fitw <- aov(wt ~ as.factor(cyl), data = mtcars)
+
+summary(fitw)
+
+```
+
+  We know there's a significant difference in weight bewteen the cylinders, now we'll see where those differnces are and how large.
+
+```{r}
+pairwise <- TukeyHSD(fitw)
+pairwise
+
+eta_squared(fitw)
+
+
+```
+
+  The car weights between the cylinders are significantly different and have a large effect size. 
+
+  While the tests show strong significance in differences in both weight and mpg performance, I suspect that using transmission, cylinders and weight in the regression model will create a redundant effect similar to multicollinearity and hinder the performance of the model. Again, I'll experiment and see.
+
+
+## Find Strong Correlations
+
+```{r, warning=FALSE}
+#column 12 is the transmission string data
+#compute correlations on all but the last column
+
+cor(mtcars[-c(12)])[,1]
+
+
+```
+  
+  Almost all the variables that have an above moderate coefficient ( $< -.5$ or $> .5$) are negative. We have no weak correlations ascending or descending, only moderate to strong. But the strongest correlations trend downward.
+
+  Rather than call a pairplot for the entire data set, we'll only focus on the strongest variables that have an absolute value of .75 or greater: displacement, horsepower, weight.
+  
+  
+```{r, warning=FALSE, message=FALSE}
+
+pairs(mtcars[c("mpg", "disp", "hp", "wt")])
+
+```
+  The scatter plots confirm a strong downward trend for miles per gallons relationship with displacement and horsepower.
+
+  Therefore, out first model will include weight, displacement, horsepower, cylinders, and transmission.
+
+
+# Regression Model
+  
+  For this exercise, I will be using errors and r-square as a measure of how well our model is performing. Additionally, I'll consider the t-test statistic with a threshold of $p < .05$. We'll start out with transmission, cylinder, displacement, horsepower, and weight as our predictors. I don't like a such a huge for something as simple as miles per gallon, but we'll see what the data says. 
+
+  First, we'll use one-hot-encoding to convert cylinders from categorical to binary.
+  
+```{r}
+#store releveant column names
+col_names <- c('vs','am','gear','carb','cyl')
+
+#apply factor function to the appropriate columns
+mtcars[col_names] <- lapply(mtcars[col_names] , factor)
+
+#one-hot
+mtcars$four_cyl <- ifelse(mtcars$cyl == 4, 1, 0)
+mtcars$six_cyl <- ifelse(mtcars$cyl == 6, 1, 0)
+mtcars$eight_cyl <- ifelse(mtcars$cyl == 8, 1, 0)
+
+#convert to factors
+mtcars$four_cyl <- factor(mtcars$four_cyl)
+mtcars$six_cyl <- factor(mtcars$six_cyl)
+mtcars$eight_cyl <- factor(mtcars$eight_cyl)
+
+```
+
+
+
+
+```{r}
+#build first model
+lm.car <- lm(mpg ~ four_cyl + six_cyl + eight_cyl + 
+               disp + hp + wt + am +disp,
+             data = mtcars)
+
+summary(lm.car)
+
+
+```
+
+  From the NA result in eight_cyl, we will have to drop it since it's coefficient is tied up in the other cylinder categories. In fact, all the cylinders showed significance, but at very low threshold.
+
+
+```{r, warning=FALSE, message=FALSE}
+lm.car <- lm(mpg ~ four_cyl + six_cyl + 
+               disp + hp + drat + wt + am + disp,
+             data = mtcars)
+
+summary(lm.car)
+```
+  
+  Weight and Horsepower are the only variables that showed significance below $p < .05$
+  
+  I'm tempted to drop all the other variables since none showed significance at  $p < .05$, but I want to see if adjusted the model will change the significance of the other variables.
+
+  We will rebuild our model based around these t-tests.
+
+```{r, warning=FALSE, message=FALSE}
+lm.car2 <- lm(mpg ~ wt + hp + 
+                four_cyl + six_cyl + am, 
+              data = mtcars)
+
+summary(lm.car2)
+```
+  Still, only horsepower and weight showed significance. I'll build a model first with only weight and horsepower as predictors, and then with the interaction of both variables.
+
+
+```{r, warning=FALSE, message=FALSE}
+lm.car3 <- lm(mpg ~ wt + hp, data = mtcars)
+
+summary(lm.car3)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+lm.car4 <- lm(mpg ~ wt + hp + wt:hp,
+              data = mtcars)
+
+summary(lm.car4)
+```
+
+Model        Num Variables    RSE      R-Square
+------       -------------    ------   --------
+lm.car              8          2.501    .8667
+lm.car2             6          2.41     .8659
+lm.car3             2          2.593    .8268
+lm.car4             3          2.153    .8848
+
+  By focusing on the Residual Standard Error (RSE) and r-square, we can get an intuition for the standard deviation of the errors and how well the model explains the variances within the data.
+  
+  The third model, lm.car3, had the highest RSE and the lower R-square. In other words, it had the biggest errors and least explainability of the variances. It also had the least variables--only horsepower and weight.
+  
+  The best model, lm.car4, had three variables--hp, weight, and the interaction of the two variables. This produced our smallest errors in addition to having the highest r-square. Shedding the variables from lm.car and lm.car2 improved the model's performance. 
+
+  Indeed, keeping a standard p-value threshold of $p < .05$ worked best for the model.
+
+  Now we'll check our assumptions for lm.car4.
+
+# Residual Analysis
+
+  We'll check for four assumptions in our residual analysis.
+  
+  1. Normality--making sure the residuals are normally distributed as means of making sure the data is not swayed by outliers. For this, we'll use, qqplots and shapiro test.
+
+  2. Independence--making sure the data isn't autocorrelated;, in other words, making sure one data point isn't influencing the next.
+
+  3. Linearity--if the predictors are truly linearly related to the response variable, then our residuals should come to look like random noise. The residuals are a way for us to understand the variance in our data. If the realtionships truly capture linearity, then our errors would in theory be random rather than systematic.
+
+  4. Homoscedasticity, or Constant Variance--the variance of our errors (or $\sigma^2$) is non-constant, we have a parameter that we can't depend on for prediction. It's important that our errors maintain constant variance so we can rely on the model.
+
+## Normality
+
+  qqPlot is a visually simpler way for us to judge normality. The dot plots should all be lined up as much as possible along the 45-degree line. Outliers will significantly depart from the line. Since beauty is in the eye of the beholder, we will also perform a Shapiro Test for Normality.
+
+  We'll use the qqPlot() function to generate a plot with a confidence interval band. Any points outside this band can be investigated as outliers. Additionally, the Shapiro Test for Normality will provide a statistic that tells us if our data is normally distributed. $H_0 =$ normally distributed.
+
+```{r, warning=FALSE, message=FALSE}
+library(car)
+
+qqPlot(lm.car4, labels = row.names(mtcars), id = list(method = 'identify'), simulate = TRUE, main = "QQPlot")
+
+shapiro.test(lm.car4$residuals)
+```
+
+  The qqPlot() shows almost all data points to be within the confidence interval band. The lower left corner of the plot has an outlier and two points in the middle of the x-axis are outliers. Shapiro statistic returned greater than .05. We fail to reject the null hypothesis that our data is normally distributed, but we should note there are three outliers of interest.
+
+  Our first assumption is met.
+
+## Independence.
+
+  The Durbin Watson test for independence can produce a p-value that tells us whether or not the data is independent. The null hypothesis is that our data is independent.
+
+```{r, warning=FALSE, message=FALSE}
+ durbinWatsonTest(lm.car4)
+
+```
+
+  p-value is not significant. We fail to reject the null hypothesis that our data is independent.
+ 
+  Second assumption is met.
+
+## Linearity
+
+  Because we have an interactive variable, we can't use the useful crPlot() function. Instead, we will reference the Residuals vs Fitted plot. We should have white noise around the horizontal line at y = 0.
+
+```{r, warning=FALSE, message=FALSE}
+# Get fitted values
+fitted_values <- predict(lm.car4)
+
+# Get residuals
+residuals <- residuals(lm.car4)
+
+#build fitted line
+lm.residuals <- lm(residuals ~ fitted_values)
+
+fitted_line <- predict(lm.residuals, newdata = data.frame(fitted_values = fitted_values))
+
+plot(lm.car4$fitted.values, lm.car4$residuals, 
+     xlab = "Fitted Values", 
+     ylab = "Residuals", 
+     main = "Residuals vs Fitted Values")
+
+# Add a horizontal line at y = 0
+abline(h = 0, lty = 2)
+
+lines(fitted_values, fitted_line, col = "red")
+```
+
+  Residuals vs fitted plot clues us in to linearity. If Y, the dependent variable, is linearly related to the independent variables, $X_1...X_n$, then the residuals should appear to be random noise around a horizontal band. Indeed the scatter plot does not follow the shape of the red band, and our plot appears to be white noise.
+  
+  Additionally, I've plotted the trend line in red of the residuals and fitted values. It's horizontal, indicating that we can't predict the residual from the fitted value. In other words, the realtionship is noise.
+  
+  Looking at the Residuals vs Fitted graph, we can see the data scattered without a pattern. We have white noise, which means our residuals are independent. 
+
+
+
+## Homoscedasticity
+
+p-value less than .05 means our data does not have constant variance.
+
+```{r, warning=FALSE, message=FALSE}
+ncvTest(lm.car4)
+spreadLevelPlot(lm.car4)
+```
+
+
+  With a pvalue of .055, we fail to reject the null hypothesis which says that our data is constant. Additionally, the spread level plot appears to show white noise. The fitted value vs residual plot trends upward, but the variance remains constanct. The spread does not unfold outwards as the fitted values increase. We do have an outlier that influences just before x = 20 that influences the plot though.
+
+  The spreadlevelPlot() function suggestions a an exponential transformation of .3995703, or $Y^{.3995703}$. This is because the line of best fit angled, but maintains a horizontal shape. The power transformation is a means to make it horizontal, but isn't necessary since we've met the assumption.
+
+  Since lm.car4 met all four assumptions and had the best RSE and r-square, I will go with this model and see if I can improve it. As a side note, I did check the assumptions for the third model. It failed all assumptions but the one for homoscedasticity. 
+
+## Multicollinearity
+
+  Since earlier the scatter plot for horsepower and weight showed a positive linear realtionship, I want to make sure that they're not influencing each other in the model. It's important to check that correlations of the predictors aren't influencing each other. Because one of our variables is interactive, we must make sure one isn't unduly affecting the correlation of the other term in relation to our response variable.
+
+
+```{r, warning=FALSE, message=FALSE}
+vif(lm.car4, type = 'predictor')
+
+```
+
+  VIF scores less than 10, which means there is no multicollinearity.
+
+
+## Outliers
+
+  We'll look one more time at outliers.
+
+```{r, warning=FALSE, message=FALSE}
+
+outlierTest(lm.car4)
+
+```
+
+  The Bonferroni test produced a test statistic p < 0.5, which means we have a significant outlier.
+
+  Because we are predicting miles per gallon, it's best not to attribute these outliers to errors.
+
+
+  Now I'll build a hat plot in order to see how many potential outliers there are.
+```{r, warning=FALSE, message=FALSE}
+hat.plot<-function(fit){
+ p<-length(coefficients(fit))
+ n<-length(fitted(fit))
+ plot(hatvalues(fit),main="Index PlotofHatValues")
+ abline(h= c(2,3)* p/n,col='red',lty=2)
+ identify(1:n,hatvalues(fit), names(hatvalues(fit)))
+}
+
+
+ hat.plot(lm.car4)
+
+```
+
+
+  According to our plot, we have four potential outliers that we'll need to identify.
+  
+
+```{r}
+
+influencePlot(lm.car4, id = "noteworthy", main = "Influence Plot",
+ sub = "Circle Size is proportional to Cook's Distnace.")
+
+```
+
+  Maserati Bora and Chrysler Imperial have high hate values compared to the rest, indicating that their independent x values reside a far distance from the distribution. 
+  
+  Cook's D can also help to identify which points are candidates for being removed. A good recommended measure is 4/n. Our data set contains 32 rows. $\frac{4}{32} = 0.125$ Any value greater than 1.25 is a candidate.
+  
+  Considering Hat values only, Chrysler Imperial and Maserati Bora stand out. With Cook's D, we have Chrysler Imperial, Toyota Carolla, and Fiat 128.
+  
+  Our visulization shows that, based on the size of the circle and coloration, Chrysler, Toyota and Fiat have the most influence on the coefficients of our model.
+
+
+```{r, warning=FALSE, message=FALSE}
+#mtcars[mtcars$mpg ==32.4,]
+
+rownames(mtcars)
+
+```
+
+17, 18, and 20 could be removed.
+
+
+```{r}
+mtcars2 <- mtcars[-c(17, 18, 20), ]
+
+newlm.cars4 <- lm(mpg~ wt + hp + wt:hp, data = mtcars2)
+
+summary(newlm.cars4)
+```
+
+  Removing the three outliers has improved our model. Residual errors now average 1.71 mpg and r-square indicates that the model can explain 90% of the variance.
+  
+  
+```{r}
+qqPlot(newlm.cars4, labels = row.names(mtcars), id = list(method = 'identify'), simulate = TRUE, main = "QQPlot")
+
+
+shapiro.test(newlm.cars4$residuals)
+
+```
+
+
+
+
+```{r}
+
+durbinWatsonTest(newlm.cars4)
+
+
+```
+
+
+
+```{r}
+ncvTest(newlm.cars4)
+
+spreadLevelPlot(newlm.cars4)
+```
+
+  Our p-value has increased, and fitted vs absolute residuals maintains white noise. The variance is constant.
+
+  Now we'll see if a power transform has a better effect on our model than removing the influential outliers did.
+  
+```{r, warning=FALSE, message=FALSE}
+
+powerTransform(mtcars$mpg)
+
+```
+  The powerTransformation model recommends we raise y to the power of .03
+
+
+```{r, warning=FALSE, message=FALSE}
+
+pwr.lm.car4 <- lm(mpg^.03 ~ wt + hp + wt:hp, 
+                  data = mtcars)
+
+summary(pwr.lm.car4)
+```
+  
+  The transform greatly reduced the RSE from 2.4 to .00353. While this is great on paper, it may be a tell-tale sign that the model is overfitted to the data set and won't generalize well.
+
+
+```{r, warning=FALSE, message=FALSE}
+# Get fitted values
+fitted_values <- predict(pwr.lm.car4)
+
+# Get residuals
+residuals <- residuals(pwr.lm.car4)
+
+
+pwr.lm.residuals <- lm(residuals ~ fitted_values)
+
+fitted_line <- predict(pwr.lm.residuals, newdata = data.frame(fitted_values = fitted_values))
+
+plot(pwr.lm.car4$fitted.values, pwr.lm.car4$residuals, 
+     xlab = "Fitted Values", 
+     ylab = "Residuals", 
+     main = "Residuals vs Fitted Values")
+
+# Add a horizontal line at y = 0
+abline(h = 0, lty = 2)
+
+lines(fitted_values, fitted_line, col = "red")
+
+
+```
+
+
+## Normality
+
+```{r, warning=FALSE, message=FALSE}
+qqPlot(pwr.lm.car4, labels = row.names(mtcars), id = list(method = 'identify'), simulate = TRUE, main = "QQPlot")
+
+
+shapiro.test(pwr.lm.car4$residuals)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+
+influencePlot(pwr.lm.car4, id = "noteworthy", main = "Influence Plot",
+ sub = "Circle Size is proportional to Cook's Distnace.")
+
+```
+
+  Transforming mpg by a power of .3 has reduced the influence of all three of the previous outliers. Although the transformation was technically unnecessary, we produced a better performing model, albeit one that may be overfitted.
+
+
+
+## Comparing Models
+
+  Now I'll compare how the models perform against each other. I'll look at the adjusted $r^2$ and utilize cross-validation. This will allow us to see how well the models will perform on unseen data. If $r^2$ drops, we'll be interested to see by how much it drops. The model with the least shrinkage is the better performing model.
+  
+```{r, warning=FALSE, message=FALSE}
+
+library(leaps)
+
+leaps<-regsubsets(mpg ~ wt + hp + wt:hp,
+                  data=mtcars2,nbest=4)
+
+
+subsTable<-function(obj,scale){
+  x<-summary(leaps)
+  m<-cbind(round(x[[scale]],3),x$which[,-1])
+  colnames(m)[1]<-scale
+  m[order(m[,1]),]
+}
+
+
+paste("Model with Outliers Removed")
+subsTable(leaps, scale= 'adjr2')
+
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+leaps <-regsubsets(mpg^.03 ~ wt + hp + wt:hp,
+                  data=mtcars,nbest=4)
+
+paste("Power Model")
+subsTable(leaps, scale= 'adjr2')
+```
+
+
+
+### Cross Validation
+
+```{r, warning=FALSE, message=FALSE}
+ 
+library("bootstrap")
+
+shrinkage <- function(fit, k=10, seed = 1){
+  require(bootstrap)
+  
+  theta.fit <- function(x,y){lsfit(x,y)}
+  theta.predict <-function(fit,x){cbind(1,x)%*%fit$coef}
+  x <- fit$model[, 2:ncol(fit$model)]
+  y <- fit$model[,1]
+  
+  set.seed(seed)
+  
+  results <- crossval(x,y, theta.fit, theta.predict, 
+                      ngroup = k)
+  r2 <- cor(y, fit$fitted.values)^2
+  r2cv <-cor(y, results$cv.fit)^2
+  cat("Original R-square", r2, "\n")
+  cat(k, "Fold Cross-Validated R-square =", r2cv, "\n")
+
+}
+
+print("Cross Validation Linear Model")
+shrinkage(newlm.cars4)
+
+print("----------------------------------")
+
+print("Cross Validation Power Model") 
+shrinkage(pwr.lm.car4)
+```
+  
+  The model with the outliers removed had the least shrinkage between the two. R-square dropped by less than 4% while the power model dropped by less than 6%. Even though both models are over-fitted to the data, the non-power model handles new data better.
+
+  Additionally, the advantage of newlm.cars4 is that it doesn't rely on an unusual power transformation to get a better fit. It's much easier to explain to business-minded people why outliers were removed than how transforming the response variable by a power of .03 will work.
+
+```{r, warning=FALSE, message=FALSE}
+library(performance)
+
+mean_abs_perc <- mean(abs( (mtcars2$mpg - predict(newlm.cars4))/mtcars2$mpg ))*100
+
+rmse <- sqrt( mean( sum( mtcars2$mpg - predict(newlm.cars4) )^2 ))
+
+paste("RMSE for model without outliers", 
+      round(rmse(newlm.cars4), 2))
+
+paste("Mean Absolute Percentage Error for model without outliers", 
+      round(mean_abs_perc, 2))
+
+paste("Root Mean Square Error for power model", 
+      round(rmse(pwr.lm.car4), 5))
+```
+  
+  The model without outliers has achieved a RMSE of 1.59 mpg with a RSE of 1.71 mpg. Additionally, the mean absolute percentage error is 6.88. This means that on average, our model will have a residual error around 1.59 and will vary around +/- 1.71 mpg, and our errors average to being off by 6.8%.
+
+  The power model has an RMSE of 0.0031, which indicates overfitting to me.
+  
+  Overall, rmse, rse, and r-squared, along with the minimal shrinkage in cross-validating, suggests that the model with outliers removed is the best performing model.
+  
+# Last, but Not Least
+
+  Lastly, I want to figure what percentage of impact each of the predictor variables $X_n$ have on the response variable $Y$ 
+
+  To do this, I'll first standardize the relevant variables and refit the model.
+
+
+```{r, warning=FALSE, message=FALSE}
+std_mpg <- scale(mtcars2$mpg)
+std_hp <- scale(mtcars2$hp)
+std_wt <- scale(mtcars2$wt)
+
+lm.std <- lm(std_mpg ~ std_wt + std_hp + std_wt:std_hp,
+             data = mtcars2)
+
+lm.std$coefficients
+```
+  
+  The coefficients can represent the percent effect that the predictor has when controlling for the others. In others, we can see that the weight of the car has 69% percent negative effect on has mileage, when controlling for horsepower and the interaction of weight and horsepower. This means for every 1 thousand pounds, weight will be responsible for 69% of the impact on the miles per gallon.
+
+
+
+# Conclusions
+
+  To reiterate the first paragraph of this post, our data set only had 32 rows. In a real world setting, this isn't enough to build a reliable model, nor should one really conduct t-tests on the data since it's too susceptible Type I or II errors, there being so few samples. 
+  
+  Neither should outliers be removed so quickly from the data set. Outliers don't represent annoyances to be removed. In our case, high mpg's in the data set can be double-checked by utilizing a search engine to check the manufacturer's specs. And if the outliers are accurate records, what justification does the statistician have in removing them? None. In this exercise I did it to go through the motions of outlier analysis and to see how if there would be any improvement.
+  
+  That being said, this exercise was to have fun, to see how low I could justifiabley get the RMSE and if I could keep the cross validation shrinkage to a minimum. Compared to the power model, removing the outliers had less of a deleterious effect that keeping them and transforming them.
+  
+  If I had to pick one, I would accept the model with the outliers removed due to its explainability.
